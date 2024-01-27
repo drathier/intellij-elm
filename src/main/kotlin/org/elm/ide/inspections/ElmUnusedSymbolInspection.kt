@@ -1,8 +1,12 @@
 package org.elm.ide.inspections
 
+import com.google.api.Logging
 import com.intellij.codeInspection.ProblemHighlightType
 import com.intellij.codeInspection.ProblemsHolder
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.psi.PsiElement
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.PsiSearchHelper
@@ -40,13 +44,19 @@ class ElmUnusedSymbolInspection : ElmLocalInspection() {
             val searchCost = PsiSearchHelper.getInstance(project).isCheapEnoughToSearch(name, scope, null, null)
             if (searchCost == TOO_MANY_OCCURRENCES) return
         }
-
         // perform Find Usages
-        val usages = ReferencesSearch.search(element).findAll()
+        try {
+            val usages = ReferencesSearch.search(element).findAll()
                 .filterNot { it.element is ElmTypeAnnotation || it.element is ElmExposedItemTag }
 
-        if (usages.isEmpty()) {
-            markAsUnused(holder, element, name)
+            if (usages.isEmpty()) {
+                markAsUnused(holder, element, name)
+            }
+        } catch (e: Exception)
+        {
+            ApplicationManager.getApplication().invokeLater {
+                Logging.getDefaultInstance().thisLogger().debug("ElmUnusedSymbolInspection.visitElement" + e.localizedMessage)
+            }
         }
     }
 

@@ -1,11 +1,12 @@
 package org.elm.ide.inspections
 
+import com.google.api.Logging
 import com.intellij.codeInsight.actions.OptimizeImportsProcessor
-import com.intellij.codeInspection.LocalInspectionTool
-import com.intellij.codeInspection.LocalInspectionToolSession
-import com.intellij.codeInspection.ProblemHighlightType
-import com.intellij.codeInspection.ProblemsHolder
+import com.intellij.codeInspection.*
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.Key
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementVisitor
@@ -93,21 +94,27 @@ class ImportVisitor(initialImports: List<ElmImportClause>) : PsiElementVisitor()
 
     override fun visitElement(element: PsiElement) {
         super.visitElement(element)
-        if (element is ElmReferenceElement && element !is ElmImportClause && element !is ElmExposedItemTag) {
-            val reference = element.reference
-            val resolved = reference.resolve() ?: return
-            val resolvedModule = resolved.elmFile.getModuleDecl() ?: return
-            val resolvedModuleName = resolvedModule.name
-            imports.remove(resolvedModuleName)
+        try {
+            if (element is ElmReferenceElement && element !is ElmImportClause && element !is ElmExposedItemTag) {
+                val reference = element.reference
+                val resolved = reference.resolve() ?: return
+                val resolvedModule = resolved.elmFile.getModuleDecl() ?: return
+                val resolvedModuleName = resolvedModule.name
+                imports.remove(resolvedModuleName)
 
-            // For now we are just going to mark exposed values/functions which are unused
-            // TODO expand this to types, union variant constructors, and operators
-            if (reference is LexicalValueReference) {
-                exposing.remove(element.referenceName)
+                // For now we are just going to mark exposed values/functions which are unused
+                // TODO expand this to types, union variant constructors, and operators
+                if (reference is LexicalValueReference) {
+                    exposing.remove(element.referenceName)
+                }
+
+                if (reference is QualifiedReference) {
+                    moduleAliases.remove(reference.qualifierPrefix)
+                }
             }
-
-            if (reference is QualifiedReference) {
-                moduleAliases.remove(reference.qualifierPrefix)
+        } catch (e: Exception) {
+            ApplicationManager.getApplication().invokeLater {
+                Logging.getDefaultInstance().thisLogger().debug("ElmUnusedImportInspection.visitElement:" + e.localizedMessage)
             }
         }
     }

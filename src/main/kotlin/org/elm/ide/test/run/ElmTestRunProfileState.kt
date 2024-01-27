@@ -26,7 +26,6 @@ import jetbrains.buildServer.messages.serviceMessages.ServiceMessageVisitor
 import org.elm.ide.notifications.showBalloon
 import org.elm.ide.test.core.ElmProjectTestsHelper
 import org.elm.ide.test.core.ElmTestJsonProcessor
-import org.elm.workspace.elmTestTool
 import org.elm.workspace.elmWorkspace
 import java.nio.file.Files
 
@@ -97,11 +96,11 @@ class ElmTestRunProfileState internal constructor(
         return consoleView
     }
 
-    private class ConsoleProperties constructor(
+    private class ConsoleProperties internal constructor(
             config: RunConfiguration,
             executor: Executor,
             private val testsRelativeDirPath: String
-    ) : SMTRunnerConsoleProperties(config, elmTestTool, executor), SMCustomMessagesParsing {
+    ) : SMTRunnerConsoleProperties(config, "elm-test", executor), SMCustomMessagesParsing {
 
         init {
 
@@ -126,11 +125,7 @@ class ElmTestRunProfileState internal constructor(
                     super.finishTesting()
                 }
 
-                override fun processServiceMessages(
-                    text: String,
-                    outputType: Key<*>,
-                    visitor: ServiceMessageVisitor
-                ): Boolean {
+                override fun processServiceMessages(text: String, outputType: Key<*>, visitor: ServiceMessageVisitor): Boolean {
                     val events = processor.accept(text) ?: return false
                     events.forEach { processEvent(it) }
                     return true

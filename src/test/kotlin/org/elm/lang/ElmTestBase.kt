@@ -42,7 +42,8 @@ import com.intellij.psi.PsiReference
 import com.intellij.psi.impl.PsiManagerEx
 import com.intellij.testFramework.LightProjectDescriptor
 import com.intellij.testFramework.PlatformTestUtil
-import com.intellij.testFramework.fixtures.LightPlatformCodeInsightFixture4TestCase
+import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.intellij.util.ThrowableRunnable
 import junit.framework.AssertionFailedError
 import org.elm.FileTree
 import org.elm.TestProject
@@ -73,7 +74,7 @@ private val log = logger<ElmTestBase>()
  *
  * For "heavier" integration tests, see [org.elm.workspace.ElmWorkspaceTestBase]
  */
-abstract class ElmTestBase : LightPlatformCodeInsightFixture4TestCase(), ElmTestCase {
+abstract class ElmTestBase : BasePlatformTestCase(), ElmTestCase {
 
     override fun getProjectDescriptor(): LightProjectDescriptor = ElmDefaultDescriptor
 
@@ -82,6 +83,17 @@ abstract class ElmTestBase : LightPlatformCodeInsightFixture4TestCase(), ElmTest
     open val dataPath: String = ""
 
     override fun getTestDataPath(): String = "${ElmTestCase.testResourcesPath}/$dataPath"
+
+    override fun runTestRunnable(testRunnable: ThrowableRunnable<Throwable>) {
+        val projectDescriptor = projectDescriptor
+        val reason = (projectDescriptor as? ElmProjectDescriptorBase)?.skipTestReason
+        if (reason != null) {
+            System.err.println("SKIP $name: $reason")
+            return
+        }
+
+        super.runTestRunnable(testRunnable)
+    }
 
     protected val fileName: String
         get() = "$testName.elm"
@@ -104,8 +116,8 @@ abstract class ElmTestBase : LightPlatformCodeInsightFixture4TestCase(), ElmTest
 
         action()
 
-        val afterDir = getVirtualFileByName("$testDataPath/$after")
-        PlatformTestUtil.assertDirectoriesEqual(afterDir!!, beforeDir)
+        val afterDir = getVirtualFileByName("$testDataPath/$after")!!
+        PlatformTestUtil.assertDirectoriesEqual(afterDir, beforeDir)
     }
 
     protected fun checkByDirectory(@Language("Elm") before: String, @Language("Elm") after: String, action: () -> Unit) {
@@ -253,7 +265,10 @@ abstract class ElmTestBase : LightPlatformCodeInsightFixture4TestCase(), ElmTest
         @JvmStatic
         fun camelOrWordsToSnake(name: String): String {
             if (' ' in name) return name.replace(" ", "_")
-            return name.split("(?=[A-Z])".toRegex()).joinToString("_") { it.lowercase(Locale.US) }
+
+            return name.split("(?=[A-Z])".toRegex())
+                    .map(String::lowercase)
+                    .joinToString("_")
         }
 
         @JvmStatic

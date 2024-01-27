@@ -1,6 +1,11 @@
 package org.elm.lang.core.psi.elements
 
+import com.google.api.Logging
 import com.intellij.lang.ASTNode
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.ui.Messages
 import com.intellij.psi.PsiElement
 import org.elm.lang.core.psi.*
 import org.elm.lang.core.psi.elements.Flavor.*
@@ -47,7 +52,7 @@ class ElmValueExpr(node: ASTNode) : ElmPsiElementImpl(node), ElmReferenceElement
                     QualifiedConstructor
                 else
                     BareConstructor
-            else -> error("one QID must be non-null")
+            else -> error("one QID must be non-null. Elm file=${this.elmFile.name}, name = ${this.name}")
         }
 
     /**
@@ -69,19 +74,28 @@ class ElmValueExpr(node: ASTNode) : ElmPsiElementImpl(node), ElmReferenceElement
 
 
     override fun getReference(): ElmReference =
-            getReferences().first()
+            references.first()
 
-    override fun getReferences(): Array<ElmReference> =
-            when (flavor) {
-                QualifiedValue -> arrayOf(
-                        QualifiedValueReference(this, valueQID!!),
-                        ModuleNameQualifierReference(this, valueQID!!, valueQID!!.qualifierPrefix)
-                )
-                QualifiedConstructor -> arrayOf(
-                        QualifiedConstructorReference(this, upperCaseQID!!),
-                        ModuleNameQualifierReference(this, upperCaseQID!!, upperCaseQID!!.qualifierPrefix)
-                )
-                BareValue -> arrayOf(LexicalValueReference(this))
-                BareConstructor -> arrayOf(SimpleUnionOrRecordConstructorReference(this))
+    override fun getReferences(): Array<ElmReference> {
+        if (valueQID == null && upperCaseQID == null) {
+            ApplicationManager.getApplication().invokeLater {
+                Logging.getDefaultInstance().thisLogger().debug("Both valueQID and upperCaseQID are null ion ElmValueExpr.getReferences")
             }
+            return EMPTY_REFERENCE_ARRAY
+        }
+        return when (flavor) {
+            QualifiedValue -> arrayOf(
+                QualifiedValueReference(this, valueQID!!),
+                ModuleNameQualifierReference(this, valueQID!!, valueQID!!.qualifierPrefix)
+            )
+
+            QualifiedConstructor -> arrayOf(
+                QualifiedConstructorReference(this, upperCaseQID!!),
+                ModuleNameQualifierReference(this, upperCaseQID!!, upperCaseQID!!.qualifierPrefix)
+            )
+
+            BareValue -> arrayOf(LexicalValueReference(this))
+            BareConstructor -> arrayOf(SimpleUnionOrRecordConstructorReference(this))
+        }
+    }
 }
